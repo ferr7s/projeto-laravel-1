@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Post;
+use App\Models\Category;
+use App\Models\Tag;
 
 class PostController extends Controller
 {
@@ -20,58 +22,49 @@ class PostController extends Controller
     //Função para exibir o formulário de criação de post
     public function create()
     {
-        //Retorna uma view que contém o formulário de criação.
-        return view('create');
+        return view(
+            'posts.create',
+            ['categories' => Category::all(), 'tags' => Tag::all()]
+        );
     }
 
     //Função para processar a submissão do formulário de criação
     public function store(Request $request)
     {
-        //Valida os dados do formulário.
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'required|string',
-        ]);
+        $post = Post::create($request->all());
 
-        //Cria uma nova postagem no banco de dados com base nos dados fornecidos.
-        Post::create([
-            'title' => $request->input('title'),
-            'content' => $request->input('content'),
-        ]);
-
-        // Redireciona para a página de listagem
-        return redirect()->route('posts.index');
+        if (isset($request['tags'])) {
+            //Use o attach para adicionar as tags associadas
+            $post->tags()->attach($request['tags']);
+        }
+        return redirect(route('posts.index'));
     }
 
     //Função para exibir o formulário de edição de uma postagem existente
-    public function edit($id)
+    public function edit(Post $post)
     {
-        //Recebe o ID da postagem a ser editada como parâmetro
-        $post = Post::findOrFail($id);
-        //Retorna uma view que contém o formulário de edição preenchido com os dados
-        return view('posts.edit', compact('post'));
+        return view(
+            'posts.edit',
+            [
+                'post' => $post, 'categories' => Category::all(),
+                'tags' => Tag::all()
+            ]
+        );
     }
 
     //Função para processar a submissão do formulário de edição
-    public function update(Request $request, $id)
+    public function update(Request $request, Post $post)
     {
-        //Recebe o ID da postagem a ser atualizada como parâmetro
-        $post = Post::findOrFail($id);
+        $post->update($request->all());
 
-        //Valida os dados do formulário
-        $request->validate([
-            'title' => 'required|string|max:255',
-            'content' => 'required|string',
-        ]);
-
-        //Atualiza os dados da postagem no banco de dados com base nos dados fornecidos
-        $post->update([
-            'title' => $request->input('title'),
-            'content' => $request->input('content'),
-        ]);
-
-        //Redireciona o usuário para a listagem de posts
-        return redirect()->route('posts.index');
+        if (isset($request['tags'])) {
+            //Use sync para atualizar as tags associadas
+            $post->tags()->sync($request['tags']);
+        } else {
+            //Remova todas as tags associadas
+            $post->tags()->detach();
+        }
+        return redirect(route('posts.show', $post->id));
     }
 
     //Função para exibir uma página de confirmação de exclusão de uma postagem
